@@ -134,15 +134,17 @@ trait Filterable
                             $subQuery->whereNotIn($field, array_map('urldecode', $actualValues));
                             break;
                         case 'between':
-                            if (is_array($operand) && count($operand) == 2) {
-                                $subQuery->whereBetween($field, [urldecode($operand[0]), urldecode($operand[1])]);
+                            $values = $this->parseTwoValueOperand($operand);
+                            if (count($values) == 2) {
+                                $subQuery->whereBetween($field, $values);
                             }
                             break;
                         case 'notbetween':
-                             if (is_array($operand) && count($operand) == 2) {
-                                 $subQuery->whereNotBetween($field, [urldecode($operand[0]), urldecode($operand[1])]);
-                             }
-                             break;
+                            $values = $this->parseTwoValueOperand($operand);
+                            if (count($values) == 2) {
+                                $subQuery->whereNotBetween($field, $values);
+                            }
+                            break;
                         case 'null':
                             $subQuery->whereNull($field);
                             break;
@@ -157,5 +159,36 @@ trait Filterable
         } else {
             $query->where($field, 'like', '%' . urldecode($value) . '%');
         }
+    }
+
+    /**
+     * Parse operand that expects exactly two values (for between/notbetween)
+     * Handles both array formats and comma-separated string formats
+     */
+    private function parseTwoValueOperand($operand): array
+    {
+        $values = [];
+        
+        if (is_array($operand)) {
+            // Format 2: filter[field][between][]=value1&filter[field][between][]=value2
+            if (count($operand) == 2) {
+                $values = [urldecode($operand[0]), urldecode($operand[1])];
+            }
+            // Handle case where array has one element with comma-separated values
+            elseif (count($operand) == 1 && is_string($operand[0]) && strpos($operand[0], ',') !== false) {
+                $parts = explode(',', $operand[0], 2);
+                if (count($parts) == 2) {
+                    $values = [urldecode(trim($parts[0])), urldecode(trim($parts[1]))];
+                }
+            }
+        } elseif (is_string($operand) && strpos($operand, ',') !== false) {
+            // Handle direct comma-separated string
+            $parts = explode(',', $operand, 2);
+            if (count($parts) == 2) {
+                $values = [urldecode(trim($parts[0])), urldecode(trim($parts[1]))];
+            }
+        }
+        
+        return $values;
     }
 }
